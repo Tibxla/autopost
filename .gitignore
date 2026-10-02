@@ -1,0 +1,37 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Configuration locale (identifiants, comptes, secret du pont) : seul .env.example est suivi
+.env
+.env.*
+!.env.example
+
+# Données vivantes : base, vidéos, captures, journaux
+donnees/
+*.sqlite
+*.sqlite3
+*.db
+*.log
+
+# Médias et captures, jamais dans le dépôt public
+*.mp4
+*.mov
+*.m4v
+*.png
+*.jpg
+*.jpeg
+*.heic
+!web/statique/*.svg
+
+# WebDriverAgent téléchargé et signé, profils, certificats
+wda/
+*.ipa
+*.app/
+*.mobileprovision
+*.p12
+*.pem
+*.cer
+*.zip
