@@ -7,7 +7,7 @@ Prérequis (voir le README) : Mode développeur actif, WebDriverAgent signé par
 certificat approuvé dans Réglages, `tunneld` lancé en root. Le tap vise le haut de l'écran, au milieu (l'encoche
 sur un iPhone XS) : il ne déclenche rien. Aucune app n'est ouverte, rien n'est publié.
 Avant le tap, le pont d'Autocalled est interrogé : s'il y a un appel en cours, ou si son état est illisible,
-l'essai s'arrête sans toucher l'écran.
+l'essai s'arrête sans toucher l'écran. Il est lu avant de lancer WDA, puis de nouveau juste avant le tap.
 """
 from __future__ import annotations
 
@@ -110,6 +110,13 @@ def main() -> None:
     if r.returncode != 0 and "already mounted" not in (r.stdout + r.stderr).lower():
         arret("montage refusé :\n" + (r.stderr or r.stdout)[-800:])
     print("montée")
+
+    # Lancer WDA est déjà un geste (le runner passe au premier plan) : le pont est lu avant, puis avant le tap.
+    etape("Téléphone libre ?")
+    libre, raison = telephone_libre(env)
+    print(raison)
+    if not libre:
+        arret("WDA non lancé : " + raison)
 
     etape(f"WebDriverAgent ({bundle})")
     journal_wda = open(SORTIES / "wda.log", "w")
