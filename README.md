@@ -15,9 +15,9 @@ autopost publie, et ne fait rien d'autre. Pas de défilement de fil, pas de like
 | Étape | État |
 |---|---|
 | iPhone vu par usbmuxd, tunnel iOS 17+ (`tunneld`) | vérifié |
-| Image développeur montée | bloqué : le Mode développeur doit être activé sur l'iPhone |
-| WebDriverAgent signé sans Mac (plumesign) et installé | script prêt (`scripts/signer-wda.sh`), pas encore lancé : il demande l'identifiant Apple |
-| Capture d'écran, flux MJPEG et tap depuis le serveur | script prêt (`scripts/essai.py`), pas encore lancé |
+| Mode développeur, image développeur montée | vérifié |
+| WebDriverAgent signé sans Mac (plumesign) et installé | vérifié : installé, profil valable 7 jours |
+| Capture d'écran, flux MJPEG et tap depuis le serveur | en attente : l'iPhone refuse de lancer WDA tant que le certificat n'est pas approuvé dans Réglages |
 | Garde d'Autocalled (pas d'action pendant un appel) | vérifiée contre le pont réel |
 | Raccourci iOS, parcours TikTok et Instagram, file, service, interface | pas commencé : on ne construit rien tant que l'essai de bout en bout ne passe pas |
 
@@ -50,6 +50,8 @@ Sur iOS 17 et plus, les services développeur passent par un tunnel. Pour l'inst
 sudo .venv/bin/pymobiledevice3 remote tunneld --host 127.0.0.1
 ```
 
+Après un redémarrage de l'iPhone, `tunneld` peut rester sans tunnel (l'iPhone était verrouillé à sa reconnexion) : l'arrêter et le relancer une fois l'iPhone déverrouillé.
+
 pymobiledevice3 propose aussi un tunnel sans root (`--userspace`, iOS 17.4 et plus) ; il sera essayé pour le service.
 
 ## Projets existants et choix
@@ -80,6 +82,8 @@ Aucun projet public trouvé ne publie sur TikTok ou Instagram depuis un iPhone r
 | [Dadoum/Sideloader](https://github.com/Dadoum/Sideloader) | GPL-3.0 | 1.0-pre4, 2024-10 | plan B : CLI qui fait la même chose, mais les correctifs récents ne sont pas publiés en binaire (il faudrait compiler du D) |
 | [NyaMisty/AltServer-Linux](https://github.com/NyaMisty/AltServer-Linux) | AGPL-3.0 | 0.0.5, 2022 | écarté : à l'abandon, pensé pour installer AltStore |
 | [zhlynn/zsign](https://github.com/zhlynn/zsign) | MIT | v1.1.2, 2026-08 | écarté : signe avec un certificat et un profil qu'on lui donne, ne parle pas à Apple |
+
+Piège de plumesign 2.6.5 : son option `--udid` attend en réalité le numéro que usbmuxd donne à l'appareil (1, 2…), pas l'UDID (« Device ID … not found » sinon) ; plumesign relit ensuite l'UDID lui-même pour enregistrer l'iPhone dans le compte. Le script lui passe ce numéro.
 
 Le script épingle les versions de plumesign et de WebDriverAgent et vérifie leurs empreintes SHA-256 avant de s'en servir.
 

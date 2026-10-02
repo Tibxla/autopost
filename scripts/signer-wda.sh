@@ -51,24 +51,35 @@ chmod +x "$OUTILS/plumesign"
 telecharger "$WDA_URL" "$OUTILS/WebDriverAgentRunner-Runner.zip" "$WDA_SHA256"
 
 dire "iPhone branché"
-UDID="$("$PMD3" usbmux list 2>/dev/null | "$RACINE/.venv/bin/python" -c '
-import json, sys
-appareils = [a for a in json.load(sys.stdin) if a.get("ConnectionType") == "USB"]
-print(appareils[0]["UniqueDeviceID"] if len(appareils) == 1 else "")
-')"
-[[ -n "$UDID" ]] || echec "il faut exactement un iPhone branché en USB et déverrouillé (« Faire confiance » accepté)"
-echo "un iPhone vu en USB"
+# plumesign 2.6.5 compare la valeur de --udid au numéro que usbmuxd donne à l'appareil (DeviceID : 1, 2…),
+# pas à son UDID (crates/plume_utils/src/device.rs, get_device_for_id) ; il lit ensuite l'UDID lui-même
+# par lockdown pour enregistrer l'appareil dans le compte. On lui passe donc ce numéro.
+NUMERO_USBMUX="$("$RACINE/.venv/bin/python" -c '
+import asyncio, inspect
+from pymobiledevice3 import usbmux
+appareils = usbmux.list_devices()
+if inspect.isawaitable(appareils):
+    appareils = asyncio.run(appareils)
+usb = [a for a in appareils if a.connection_type == "USB"]
+print(usb[0].devid if len(usb) == 1 else "")
+' 2>/dev/null)"
+[[ -n "$NUMERO_USBMUX" ]] || echec "il faut exactement un iPhone branché en USB et déverrouillé (« Faire confiance » accepté)"
+echo "un iPhone vu en USB (numéro usbmuxd $NUMERO_USBMUX)"
 
 # Identifiant du runner : choisi une fois, gardé dans .env (non suivi par git), réutilisé chaque semaine.
 BUNDLE="${WDA_BUNDLE_ID:-$(lire_env WDA_BUNDLE_ID)}"
 if [[ -z "$BUNDLE" ]]; then
   BUNDLE="autopost.wda.$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  printf 'WDA_BUNDLE_ID=%s\n' "$BUNDLE" >> "$RACINE/.env"
+  if grep -q '^WDA_BUNDLE_ID=$' "$RACINE/.env" 2>/dev/null; then
+    sed -i "s/^WDA_BUNDLE_ID=\$/WDA_BUNDLE_ID=$BUNDLE/" "$RACINE/.env"
+  else
+    printf 'WDA_BUNDLE_ID=%s\n' "$BUNDLE" >> "$RACINE/.env"
+  fi
   echo "identifiant du runner créé et gardé dans .env : $BUNDLE"
 fi
 
 dire "Compte Apple"
-if "$OUTILS/plumesign" account list 2>/dev/null | grep -q '@'; then
+if "$OUTILS/plumesign" account list 2>&1 | grep -q "(selected)"; then
   echo "session plumesign déjà ouverte (plumesign account list pour la voir)"
 else
   APPLE_ID="${APPLE_ID:-$(lire_env APPLE_ID)}"
@@ -89,7 +100,7 @@ rm -rf "$TRAVAIL"/WebDriverAgentRunner-Runner.app/PlugIns/*.dSYM
   --apple-id \
   --custom-identifier "$BUNDLE" \
   --register-and-install \
-  --udid "$UDID"
+  --udid "$NUMERO_USBMUX"
 
 dire "Vérification sur l'iPhone"
 "$PMD3" apps list 2>/dev/null | "$RACINE/.venv/bin/python" -c '
@@ -99,7 +110,8 @@ trouves = {k: v for k, v in apps.items() if "WebDriverAgent" in v.get("CFBundleE
 if not trouves:
     sys.exit("WebDriverAgent introuvable sur l’iPhone après installation")
 for ident, info in trouves.items():
-    print(f"installé : {ident} (exécutable {info.get(\"CFBundleExecutable\")})")
+    executable = info.get("CFBundleExecutable")
+    print(f"installé : {ident} (exécutable {executable})")
 ' "$BUNDLE"
 
 "$PMD3" provision list 2>/dev/null | "$RACINE/.venv/bin/python" -c '
@@ -108,7 +120,8 @@ profils = json.load(sys.stdin)
 for p in profils:
     ident = p.get("Entitlements", {}).get("application-identifier", "")
     if sys.argv[1] in ident:
-        print(f"profil valable jusqu’au {p.get(\"ExpirationDate\")} (à re-signer avant)")
+        fin = p.get("ExpirationDate")
+        print(f"profil valable jusqu’au {fin} (à re-signer avant)")
 ' "$BUNDLE" || true
 
 cat <<'FIN'

@@ -129,6 +129,12 @@ def main() -> None:
     try:
         for _ in range(60):
             if processus[0].poll() is not None:
+                journal = (SORTIES / "wda.log").read_text(errors="replace")
+                if "failed to launch process" in journal.lower():
+                    arret("l'iPhone refuse de lancer WDA. Cause la plus fréquente : certificat pas encore approuvé "
+                          "(Réglages > Général > VPN et gestion de l'appareil > Faire confiance), ou signature expirée "
+                          "(relancer scripts/signer-wda.sh). Le détail est dans le journal système de l'iPhone : "
+                          ".venv/bin/pymobiledevice3 syslog live | grep -i trust")
                 arret(f"le lanceur XCUITest s'est arrêté, voir {SORTIES / 'wda.log'}")
             try:
                 statut = requests.get(f"{wda}/status", timeout=2).json()
